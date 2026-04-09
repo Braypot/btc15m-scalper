@@ -138,7 +138,6 @@ select option{background:var(--bg)}
   <div class="tab" onclick="switchTab('kalshi')">🟢 Kalshi</div>
 </div>
 
-<!-- SCALP TAB -->
 <div id="tab-scalp" class="panel active">
   <div class="price-board" id="price-board">
     <div class="price-row">
@@ -187,7 +186,6 @@ select option{background:var(--bg)}
   <div class="disclaimer"><strong>⚠ NOT FINANCIAL ADVICE.</strong> Only bet what you can afford to lose.</div>
 </div>
 
-<!-- POSITIONS TAB -->
 <div id="tab-positions" class="panel">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -199,7 +197,6 @@ select option{background:var(--bg)}
   </div>
 </div>
 
-<!-- KALSHI TAB -->
 <div id="tab-kalshi" class="panel">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px">Live Kalshi Account</div>
@@ -231,7 +228,6 @@ const fmt=(n,d=2)=>n!=null?Number(n).toLocaleString('en-US',{minimumFractionDigi
 
 let price=null,prevPrice=null,ch24=null,history=[],hi=null,lo=null,flashTimer=null,side=null,settleId=null;
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['scalp','positions','kalshi'][i]===t));
   document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
@@ -240,19 +236,19 @@ function switchTab(t){
   if(t==='kalshi')loadKalshi();
 }
 
-// ── Price Feed ────────────────────────────────────────────────────────────────
+// ── Binance price feed — no rate limits, stays live permanently ───────────────
 async function poll(){
   try{
-    const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true',{cache:'no-store'});
+    const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT',{cache:'no-store'});
     const d=await r.json();
-    const p=d.bitcoin.usd;
+    const p=parseFloat(d.lastPrice);
     prevPrice=price; price=p;
-    if(d.bitcoin.usd_24h_change!=null) ch24=d.bitcoin.usd_24h_change;
+    ch24=parseFloat(d.priceChangePercent);
     history.push(p); if(history.length>180)history.shift();
     if(hi===null||p>hi)hi=p; if(lo===null||p<lo)lo=p;
     updateUI(); drawSpark(); updateSignals(); setLive(true);
   }catch{setLive(false);}
-  setTimeout(poll,5000);
+  setTimeout(poll,3000);
 }
 
 function setLive(on){
@@ -299,7 +295,6 @@ function drawSpark(){
   const L=pts[pts.length-1];ctx.beginPath();ctx.arc(L.x,L.y,3,0,Math.PI*2);ctx.fillStyle=col;ctx.shadowBlur=12;ctx.fill();
 }
 
-// ── Signals ───────────────────────────────────────────────────────────────────
 const calcMom=(n=12)=>{if(history.length<n)return 0;const s=history.slice(-n);return(s[s.length-1]-s[0])/s[0]*100;};
 const calcVol=(n=20)=>{const s=history.slice(-n);if(s.length<2)return 0;const m=s.reduce((a,b)=>a+b,0)/s.length;return Math.sqrt(s.reduce((a,b)=>a+Math.pow(b-m,2),0)/s.length);};
 const calcTrend=(n=30)=>{if(history.length<n)return 0;const s=history.slice(-n),h=Math.floor(n/2),a=s.slice(0,h).reduce((x,v)=>x+v,0)/h,b=s.slice(h).reduce((x,v)=>x+v,0)/h;return(b-a)/a*100;};
@@ -317,8 +312,8 @@ function updateSignals(){
   momBar.style.background=mom>0?'#00e676':mom<0?'#ff1744':'var(--ne)';
   const volEl=document.getElementById('sig-vol'),volBar=document.getElementById('sig-vol-bar');
   const volCol=vol>30?'#ff1744':vol>15?'#f7931a':'#00e676';
-  volEl.textContent='$'+vol.toFixed(0); volEl.style.color=volCol;
-  volBar.style.width=Math.min(vol/50*100,100)+'%'; volBar.style.background=volCol;
+  volEl.textContent='$'+vol.toFixed(0);volEl.style.color=volCol;
+  volBar.style.width=Math.min(vol/50*100,100)+'%';volBar.style.background=volCol;
   const trendEl=document.getElementById('sig-trend'),trendBar=document.getElementById('sig-trend-bar');
   trendEl.textContent=(trend>=0?'▲':'▼')+Math.abs(trend).toFixed(3)+'%';
   trendEl.style.color=trend>0.005?'var(--up)':trend<-0.005?'var(--dn)':'var(--ne)';
@@ -330,26 +325,24 @@ function updateSignals(){
   if(pts<15){box.className='signal-box neutral';dirEl.textContent='WAITING';strEl.textContent='—';subEl.textContent='Need more data...';return;}
   if(bull>bear&&bull>=1.5){
     box.className='signal-box bullish';dirEl.textContent='📈 HIGHER';
-    const str=bull>=2.5?'STRONG':bull>=2?'MODERATE':'WEAK';
-    strEl.textContent=str;strEl.style.color='var(--up)';subEl.textContent='Momentum + trend bullish';
+    strEl.textContent=bull>=2.5?'STRONG':bull>=2?'MODERATE':'WEAK';
+    strEl.style.color='var(--up)';subEl.textContent='Momentum + trend bullish';
   }else if(bear>bull&&bear>=1.5){
     box.className='signal-box bearish';dirEl.textContent='📉 LOWER';
-    const str=bear>=2.5?'STRONG':bear>=2?'MODERATE':'WEAK';
-    strEl.textContent=str;strEl.style.color='var(--dn)';subEl.textContent='Momentum + trend bearish';
+    strEl.textContent=bear>=2.5?'STRONG':bear>=2?'MODERATE':'WEAK';
+    strEl.style.color='var(--dn)';subEl.textContent='Momentum + trend bearish';
   }else{
     box.className='signal-box neutral';dirEl.textContent='➡️ NEUTRAL';
     strEl.textContent='WEAK';strEl.style.color='var(--ne)';subEl.textContent='No clear edge — consider waiting';
   }
 }
 
-// ── Side ──────────────────────────────────────────────────────────────────────
 function setSide(s){
   side=s;
   document.getElementById('btn-h').classList.toggle('sel',s==='higher');
   document.getElementById('btn-l').classList.toggle('sel',s==='lower');
 }
 
-// ── Analyze ───────────────────────────────────────────────────────────────────
 async function analyze(){
   const err=document.getElementById('err-box'),res=document.getElementById('result-card');
   err.style.display='none';res.style.display='none';
@@ -385,7 +378,6 @@ function renderResult(d,stake,yes){
   setTimeout(()=>{const f=document.getElementById('cf-fill');if(f)f.style.width=cf+'%';},120);
 }
 
-// ── Trade Log ─────────────────────────────────────────────────────────────────
 function logTrade(aiSide,stake,yes){
   const trades=getTrades();
   trades.unshift({id:Date.now(),side:side.toUpperCase(),aiSide,stake:parseFloat(stake)||0,yes:parseFloat(yes)||0,entry:price,time:new Date().toISOString(),status:'open',payout:null});
@@ -419,55 +411,29 @@ function closeOverlay(){document.getElementById('overlay').classList.remove('ope
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeOverlay();});
 function clearLog(){if(!confirm('Clear all trades?'))return;localStorage.removeItem('btc15m_v2');renderLog();}
 
-// ── Kalshi Live Positions ─────────────────────────────────────────────────────
 async function loadKalshi(){
   document.getElementById('kalshi-positions').innerHTML=`<div style="text-align:center;padding:30px;color:var(--mu);font-family:monospace;font-size:12px">Loading your Kalshi positions...</div>`;
   try{
     const r=await fetch('/api/kalshi');
     const data=await r.json();
     if(data.error){document.getElementById('kalshi-positions').innerHTML=`<div style="color:var(--dn);font-family:monospace;font-size:12px;padding:16px">⚠ ${data.error}</div>`;return;}
-
-    // Balance
     const bal=data.balance;
     if(bal){
       const available=(bal.balance/100).toFixed(2);
       document.getElementById('kalshi-balance').innerHTML=`<div class="balance-box"><div><div style="font-size:10px;color:var(--mu);font-family:monospace;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Account Balance</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;color:var(--up)">$${fmt(available)}</div></div><div style="text-align:right"><div style="font-size:10px;color:var(--mu);font-family:monospace">KALSHI</div><div style="font-size:11px;color:var(--ac);font-family:monospace;margin-top:2px">LIVE ACCOUNT</div></div></div>`;
     }
-
-    // Positions
     const positions=data.positions?.market_positions||[];
-    if(!positions.length){
-      document.getElementById('kalshi-positions').innerHTML=`<div style="text-align:center;padding:30px;color:var(--mu);font-family:monospace;font-size:12px">No open positions found</div>`;
-      return;
-    }
-
-    document.getElementById('kalshi-positions').innerHTML=`
-      <div class="card-title" style="margin-bottom:10px">Open Positions (${positions.length})</div>
-      ${positions.map(p=>{
-        const cost=(p.total_cost/100).toFixed(2);
-        const value=(p.value/100).toFixed(2);
-        const pnl=((p.value-p.total_cost)/100).toFixed(2);
-        const pnlCol=pnl>=0?'var(--up)':'var(--dn)';
-        const yesContracts=p.position>0;
-        return `<div class="kalshi-pos">
-          <div class="kalshi-pos-title">${p.market_id||'Unknown Market'}</div>
-          <div class="kalshi-pos-row">
-            <span>Side: <span style="color:${yesContracts?'var(--up)':'var(--dn)'}">${yesContracts?'YES':'NO'}</span> · ${Math.abs(p.position)} contracts</span>
-            <span style="color:${pnlCol}">${pnl>=0?'+':''}$${pnl}</span>
-          </div>
-          <div class="kalshi-pos-row">
-            <span>Cost: $${cost}</span>
-            <span>Value: $${value}</span>
-          </div>
-        </div>`;
-      }).join('')}
-    `;
-  }catch(e){
-    document.getElementById('kalshi-positions').innerHTML=`<div style="color:var(--dn);font-family:monospace;font-size:12px;padding:16px">⚠ Failed to load: ${e.message}</div>`;
-  }
+    if(!positions.length){document.getElementById('kalshi-positions').innerHTML=`<div style="text-align:center;padding:30px;color:var(--mu);font-family:monospace;font-size:12px">No open positions found</div>`;return;}
+    document.getElementById('kalshi-positions').innerHTML=`<div class="card-title" style="margin-bottom:10px">Open Positions (${positions.length})</div>${positions.map(p=>{
+      const cost=(p.total_cost/100).toFixed(2);
+      const value=(p.value/100).toFixed(2);
+      const pnl=((p.value-p.total_cost)/100).toFixed(2);
+      const pnlCol=pnl>=0?'var(--up)':'var(--dn)';
+      return `<div class="kalshi-pos"><div class="kalshi-pos-title">${p.market_id||'Unknown'}</div><div class="kalshi-pos-row"><span>Side: <span style="color:${p.position>0?'var(--up)':'var(--dn)'}">${p.position>0?'YES':'NO'}</span> · ${Math.abs(p.position)} contracts</span><span style="color:${pnlCol}">${pnl>=0?'+':''}$${pnl}</span></div><div class="kalshi-pos-row"><span>Cost: $${cost}</span><span>Value: $${value}</span></div></div>`;
+    }).join('')}`;
+  }catch(e){document.getElementById('kalshi-positions').innerHTML=`<div style="color:var(--dn);font-family:monospace;font-size:12px;padding:16px">⚠ Failed: ${e.message}</div>`;}
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
 poll();
 renderLog();
 window.addEventListener('resize',drawSpark);
